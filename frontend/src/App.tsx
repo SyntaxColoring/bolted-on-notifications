@@ -1,62 +1,49 @@
-import React, { useEffect } from 'react';
+import React, { FormEvent } from 'react';
 import logo from './logo.svg';
 import './App.css';
-
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  QueryClient,
-  QueryClientProvider,
-  UseQueryResult,
-} from '@tanstack/react-query'
-
-const BASE_URL = "http://localhost:8000"
-const BASE_URL_SUBSCRIPTIONS = "ws://localhost:8000/subscribe"
+import { LOREM_IPSUM, EMOJI } from './lorem_ipsum';
+import { set } from 'zod';
+import { title } from 'process';
 
 interface Post {
-  id: string
   title: string
   body: string
 }
 
-interface PostTitleOnly {
-  id: string
-  title: string
-  body: string
-}
-
-interface AllPostsResponse {
-  data: Array<Post> | Array<PostTitleOnly>
-}
-
-class SubscriptionClient {
-
-}
-
-interface SubscriptionRequest {
-  requestID: string
-  urlPath: Array<string>
-}
-
-const queryClient = new QueryClient()
-const subscriptionClient = new SubscriptionClient()
+const INITIAL_POSTS: Array<Post> = [
+  {title: "This is the first post!", body: "Wow, a post body."},
+  {title: "Here's some lorem ipsum.", body: LOREM_IPSUM},
+  {title: "Some emoji 😎", body: EMOJI}
+]
 
 function App(): JSX.Element {
   const [count, setCount] = React.useState(123)
+  const [showPostForm, setShowPostForm] = React.useState(false)
+  const [posts, setPosts] = React.useState(INITIAL_POSTS)
 
-  function onClick() {
-    setCount(count+1)
+  function handleFormCancel() { setShowPostForm(false) }
+  function handleFormSubmit(newPost: Post) {
+    setPosts([newPost].concat(posts))
+    setShowPostForm(false);
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <div>
-        <Button count={count} onClick={onClick} />
-        <Button count={count} onClick={onClick} />
-        <Posts />
-      </div>
-    </QueryClientProvider>
+    <div>
+      <h1>Buttons</h1>
+      <p>Here are a couple of buttons because wow I'm learning react omg</p>
+      <Button count={count} onClick={() => setCount(count-1)} />
+      <Button count={count} onClick={() => setCount(count+1)} />
+
+      <h1>Posts</h1>
+      {
+        showPostForm ?
+        <PostForm handleCancel={handleFormCancel} handleSubmit={handleFormSubmit}/> :
+        <button onClick={() => setShowPostForm(true)}>
+          Write a new post
+        </button>
+      }
+      <Posts posts={posts}/>
+    </div>
   )
 }
 
@@ -66,86 +53,66 @@ function Button({count, onClick}: {count: number, onClick: () => void}): JSX.Ele
   )
 }
 
-function useAllPostsList(): UseQueryResult<AllPostsResponse, unknown> {
-  async function fetchAllPosts(): Promise<AllPostsResponse> {
-    const url = `${BASE_URL}/posts`
-    const response = await fetch(url)
-    if (!response.ok) throw new Error("Response not OK.")
-    return response.json()
+function Posts({posts}: {posts: Array<Post>}): JSX.Element {
+  return (<>
+    {
+      posts.map((post) => (
+        <Post
+          // key={post.title}
+          title={post.title}
+          body={post.body}
+        />
+      ))
+    }
+  </>)
+}
+
+function Post(props: Post): JSX.Element {
+  const [expanded, setExpanded] = React.useState(false)
+  function handleClick() {
+    setExpanded(!expanded)
+  }
+  return (
+    <>
+      <h2>
+        {props.title}
+        <button onClick={handleClick}>{expanded ? "Hide" : "Expand"}</button>
+      </h2>
+      {expanded && <p>{props.body}</p>}
+    </>
+  )
+}
+
+function PostForm(
+  { handleSubmit, handleCancel }: {
+    handleSubmit: (post: Post) => void,
+    handleCancel: () => void
+  }
+): JSX.Element {
+  const [title, setTitle] = React.useState("");
+  const [body, setBody] = React.useState("");
+
+  function passAlongSubmission(e: FormEvent) {
+    e.preventDefault()
+    handleSubmit({title, body})
   }
 
-  const urlPath = ["posts"]
-  // TODO: This should happen after the WebSocket is set up.
-  const query = useQuery({
-    queryKey: urlPath,
-    queryFn: () => fetchAllPosts(),
-    staleTime: Infinity
-  })
-  const queryClient = useQueryClient()
-
-  // TODO: This apparently unsubscribes and resubscribes every time we click the buttons, which...does not seem like what we want.
-  useEffect(
-      () => {
-      console.log("Subscribing to WebSocket.")
-      const websocket = new WebSocket(BASE_URL_SUBSCRIPTIONS)
-      const randomID = Math.random().toString()
-      websocket.onopen = () => {
-        const subscriptionRequest: SubscriptionRequest = {
-          requestID: randomID,
-          urlPath: urlPath,
-        }
-        websocket.send(JSON.stringify(subscriptionRequest))
-      }
-      websocket.onmessage = (event) => {
-        console.log(event)
-        const data = JSON.parse(event.data)
-        if (data.inResponseToRequestID === randomID) {
-          queryClient.invalidateQueries({queryKey: urlPath})
-        }
-      }
-
-      return () => {
-        console.log("Unsubscribing from Websocket.")
-        websocket.close()
-      }
-    },
-    []
-  )
-
-  return query
-}
-
-function Posts(): JSX.Element {
-  const postsList = useAllPostsList()
-
-  // // Mutations
-  // // const mutation = useMutation({
-  // //   mutationFn: postTodo,
-  // //   onSuccess: () => {
-  // //     // Invalidate and refetch
-  // //     queryClient.invalidateQueries({ queryKey: ['todos'] })
-  // //   },
-  // // })
-
   return (
-    <div>
-      <h1>Posts</h1>
-      <ul>
-        {postsList.data?.data.map((post) => (
-          <li key={post.id}>{post.title}</li>
-        ))}
-      </ul>
-    </div>
+    <form onSubmit={passAlongSubmission}>
+      <label>
+        Title
+        <input onChange={(e) => setTitle(e.target.value)}></input>
+      </label>
+
+      <label>
+        Contents
+        <textarea onChange={(e) => setBody(e.target.value)}></textarea>
+      </label>
+
+      <input type="button" value="Cancel" onClick={handleCancel} />
+      <input type="submit" value="Submit"/>
+    </form>
   )
 }
 
-
-export default App;
-
-
-
-
-// TODO:
-// Parent connection WS thing with reconnection
-// Logical multiplexed subscription inner connection
-// useEffect so sub/unsub from logical multiplexed subscription thing
+export default App
