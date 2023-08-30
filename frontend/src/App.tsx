@@ -1,9 +1,6 @@
 import React, { FormEvent } from 'react';
-import logo from './logo.svg';
 import './App.css';
 import { LOREM_IPSUM, EMOJI } from './lorem_ipsum';
-import { set } from 'zod';
-import { title } from 'process';
 
 interface Post {
   title: string
@@ -58,7 +55,6 @@ function Posts({posts}: {posts: Array<Post>}): JSX.Element {
     {
       posts.map((post) => (
         <Post
-          // key={post.title}
           title={post.title}
           body={post.body}
         />
