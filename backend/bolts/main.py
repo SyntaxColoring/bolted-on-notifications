@@ -56,14 +56,14 @@ class SubscriptionRequest(msgspec.Struct):
 
 
 class SubscriptionResponse(msgspec.Struct):
-    inResponseToRequestID: str
-    status: typing.Literal["subscribed"] = "subscribed"
+    requestID: str
+    subscriptionID: str
+    messageType: typing.Literal["subscribeResponse"] = "subscribeResponse"
 
 
 class SubscriptionNotificaton(msgspec.Struct):
-    # TODO: Consider using a different ID for subscriptions than the original request ID.
-    inResponseToRequestID: str
-    event: typing.Literal["updated"] = "updated"
+    subscriptionID: str
+    messageType: typing.Literal["subscriptionNotification"] = "subscriptionNotification"
 
 
 @dataclasses.dataclass
@@ -209,7 +209,7 @@ async def websocket_subscribe(websocket: WebSocket) -> None:
                             await websocket.send_text(
                                 msgspec.json.encode(
                                     SubscriptionNotificaton(
-                                        inResponseToRequestID=parsed_message.requestID,
+                                        subscriptionID=parsed_message.requestID,
                                     )
                                 ).decode("utf-8")
                             )
@@ -217,7 +217,8 @@ async def websocket_subscribe(websocket: WebSocket) -> None:
 
                 task_group.create_task(subscribe_to_posts())
                 response = SubscriptionResponse(
-                    inResponseToRequestID=parsed_message.requestID
+                    requestID=parsed_message.requestID,
+                    subscriptionID=parsed_message.requestID,
                 )
                 await websocket.send_text(
                     msgspec.json.encode(response).decode("utf-8")  # TODO: Is UTF-8 appropriate?

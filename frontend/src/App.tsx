@@ -1,6 +1,11 @@
 import React, { FormEvent } from 'react';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+
 import './App.css';
 import { LOREM_IPSUM, EMOJI } from './lorem_ipsum';
+import { usePosts } from './hooks';
+import ReconnectingWebSocket from 'reconnecting-websocket';
+import { WS_URL } from './urls';
 
 interface Post {
   title: string
@@ -13,15 +18,33 @@ const INITIAL_POSTS: Array<Post> = [
   {title: "Some emoji 😎", body: EMOJI}
 ]
 
+const queryClient = new QueryClient()
+const reconnectingWebSocket = new ReconnectingWebSocket(WS_URL)
+
 function App(): JSX.Element {
+  const [showApp, setShowApp] = React.useState(true)
+  return (
+    <>
+      <button onClick={() => setShowApp(!showApp)}>Show/hide app</button>
+      <QueryClientProvider client={queryClient}>
+        {showApp && <Main />}
+      </QueryClientProvider>
+    </>
+  )
+}
+
+function Main(): JSX.Element {
   const [count, setCount] = React.useState(123)
   const [showPostForm, setShowPostForm] = React.useState(false)
-  const [posts, setPosts] = React.useState(INITIAL_POSTS)
+
+  const postsQueryResult = usePosts(reconnectingWebSocket)
+  const posts = postsQueryResult.data?.data || []
+  const isLoading = postsQueryResult.isLoading || postsQueryResult.isFetching
 
   function handleFormCancel() { setShowPostForm(false) }
   function handleFormSubmit(newPost: Post) {
-    setPosts([newPost].concat(posts))
-    setShowPostForm(false);
+    // setPosts([newPost].concat(posts))
+    // setShowPostForm(false);
   }
 
   return (
@@ -31,7 +54,7 @@ function App(): JSX.Element {
       <Button count={count} onClick={() => setCount(count-1)} />
       <Button count={count} onClick={() => setCount(count+1)} />
 
-      <h1>Posts</h1>
+      <h1>{isLoading ? "Loading..." : "Posts"}</h1>
       {
         showPostForm ?
         <PostForm handleCancel={handleFormCancel} handleSubmit={handleFormSubmit}/> :
