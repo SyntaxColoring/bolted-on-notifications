@@ -19,7 +19,7 @@ const INITIAL_POSTS: Array<Post> = [
 ]
 
 const queryClient = new QueryClient()
-const reconnectingWebSocket = new ReconnectingWebSocket(WS_URL)
+const webSocket = new WebSocket(WS_URL)
 
 function App(): JSX.Element {
   const [showApp, setShowApp] = React.useState(true)
@@ -37,7 +37,7 @@ function Main(): JSX.Element {
   const [count, setCount] = React.useState(123)
   const [showPostForm, setShowPostForm] = React.useState(false)
 
-  const postsQueryResult = usePosts(reconnectingWebSocket)
+  const postsQueryResult = usePosts(webSocket)
   const posts = postsQueryResult.data?.data || []
   const isLoading = postsQueryResult.isLoading || postsQueryResult.isFetching
 

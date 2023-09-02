@@ -9,65 +9,38 @@ import { wsRequest } from './ws-utils'
 
 type SubscriptionRequest = z.infer<typeof wsModels.subscribeRequestSchema>;
 
-export function usePosts(webSocket: ReconnectingWebSocket) {
+export function usePosts(webSocket: WebSocket) {
     const queryClient = useQueryClient()
-    const queryKey: string[] = []
+    const queryKey: string[] = ["posts"]
 
     useEffect(
         () => {
-            const subscriptionRequestID = generateID()
-
-            let subscriptionID: null | string = null
-
-            function openSubscription() {
-                const subscriptionRequest: SubscriptionRequest = {
-                    messageType: "subscribeRequest",
-                    requestID: subscriptionRequestID,
-                    urlPath: ["posts"],
-                }
-                webSocket.send(JSON.stringify(subscriptionRequest))
-                console.log("Opening subscription.")
+            const subscriptionRequest: wsModels.SubscribeRequest = {
+                messageType: "subscribeRequest",
+                requestID: generateID(),
+                urlPath: queryKey,
             }
-
-            function closeSubscription() {
-                console.log("Closing subscription.")
-            }
-
-            function handleMessage(event: MessageEvent) {
-                const jsonData = JSON.parse(event.data)
-                console.log("Got data:", jsonData)
-                const asSubscribeResponse = wsModels.subscribeResponseSchema.safeParse(jsonData)
-                const asNotification = wsModels.subscriptionNotificationSchema.safeParse(jsonData)
-
-                if (asSubscribeResponse.success) {
-                    const data = asSubscribeResponse.data
-                    if (data.requestID === subscriptionRequestID) {
-                        subscriptionID = data.subscriptionID
-                        // TODO: Set ready.
-                        console.log("Subscribed!")
+            console.log("Subscribing...")
+            wsSubscribeRequest(webSocket as WebSocket, subscriptionRequest)
+            .then((subscribeResponse) => {
+                console.log("Subscribed!")
+                webSocket.addEventListener("message", (event) => {
+                    // TODO: Deduplicate with ws-utils?
+                    let parsedResponse;
+                    try {
+                        parsedResponse = wsModels.subscriptionNotificationSchema.parse(JSON.parse(event.data))
                     }
-                }
-
-                if (asNotification.success) {
-                    const data = asNotification.data
-                    if (data.subscriptionID === subscriptionID) {
-                        console.log("Received notification!")
-                        queryClient.invalidateQueries({queryKey})
+                    catch {
+                        return // Ignore messages that don't parse as a notification.
                     }
-                }
-            }
-
-            webSocket.addEventListener("message", handleMessage)
-            webSocket.addEventListener("open", openSubscription)
-            if (webSocket.readyState == WebSocket.OPEN) {
-                openSubscription()
-            }
+                    if (parsedResponse.subscriptionID === subscribeResponse.subscriptionID) {
+                        console.log("It's a notification.")
+                    }
+                })
+            })
 
             function cleanup() {
                 console.log("Cleaning up.")
-                webSocket.removeEventListener("open", openSubscription)
-                webSocket.removeEventListener("message", handleMessage)
-                closeSubscription()
             }
 
             return cleanup
