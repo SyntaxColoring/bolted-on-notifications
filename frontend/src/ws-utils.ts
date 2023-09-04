@@ -1,7 +1,8 @@
 import { z } from "zod"
 import * as wsModels from "./ws-models"
 
-export function wsRequest(webSocket: WebSocket, request: wsModels.Request): Promise<wsModels.Response> {
+
+export function wsRequest(webSocket: WebSocket, request: wsModels.Request): Promise<wsModels.AnyFromServer> {
     return new Promise((resolve, reject) => {
         const handleMessage = (event: MessageEvent) => {
             let parsedResponse;
@@ -13,7 +14,10 @@ export function wsRequest(webSocket: WebSocket, request: wsModels.Request): Prom
             }
             if (parsedResponse.requestID === request.requestID) {
                 webSocket.removeEventListener("message", handleMessage)
-                resolve(parsedResponse)
+                // TODO: Find a better way to do this.
+                // We need to parse redundantly to AnyFromServer because when we just parse as
+                // Response, Zod throws away response-specific keys like subscriptionID.
+                resolve(wsModels.anyFromServerSchema.parse(JSON.parse(event.data)))
             }
         }
         webSocket.addEventListener("message", handleMessage)
