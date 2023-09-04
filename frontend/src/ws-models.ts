@@ -41,5 +41,8 @@ export const subscriptionNotificationSchema = z.object({
 export type SubscriptionNotification = z.infer<typeof subscriptionNotificationSchema>
 
 
-export const anyFromServerSchema = z.union([subscribeResponseSchema, subscriptionNotificationSchema])
+export const anyFromServerSchema = z.discriminatedUnion(
+    "messageType",
+    [subscribeResponseSchema, subscriptionNotificationSchema]
+)
 export type AnyFromServer = z.infer<typeof anyFromServerSchema>
