@@ -75,11 +75,12 @@ function Button({count, onClick}: {count: number, onClick: () => void}): JSX.Ele
   )
 }
 
-function Posts({posts}: {posts: Array<Post>}): JSX.Element {
+function Posts({posts}: {posts: Array<Post & {id: string}>}): JSX.Element {
   return (<>
     {
       posts.map((post) => (
         <Post
+          key={post.id}
           title={post.title}
           body={post.body}
         />
