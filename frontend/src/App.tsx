@@ -54,7 +54,9 @@ function Main(): JSX.Element {
       <Button count={count} onClick={() => setCount(count-1)} />
       <Button count={count} onClick={() => setCount(count+1)} />
 
-      <h1>{isLoading ? "Loading..." : "Posts"}</h1>
+      <h1>Posts</h1>
+      <p>Status: {postsQueryResult.status}</p>
+      <p>Fetch status: {postsQueryResult.fetchStatus}</p>
       {
         showPostForm ?
         <PostForm handleCancel={handleFormCancel} handleSubmit={handleFormSubmit}/> :
