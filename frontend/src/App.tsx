@@ -5,7 +5,7 @@ import './App.css';
 import { LOREM_IPSUM, EMOJI } from './lorem_ipsum';
 import { usePosts } from './hooks';
 import ReconnectingWebSocket from 'reconnecting-websocket';
-import { WS_URL } from './urls';
+import { WS_URL, BASE_URL } from './urls';
 
 interface Post {
   title: string
@@ -43,8 +43,13 @@ function Main(): JSX.Element {
 
   function handleFormCancel() { setShowPostForm(false) }
   function handleFormSubmit(newPost: Post) {
-    // setPosts([newPost].concat(posts))
-    // setShowPostForm(false);
+    // TODO: Make this a react-query mutation.
+    fetch(
+      `${BASE_URL}/posts`, {
+        method: "POST",
+        body: JSON.stringify(newPost)
+      })
+    setShowPostForm(false);
   }
 
   return (
