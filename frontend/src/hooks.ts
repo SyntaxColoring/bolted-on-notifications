@@ -35,6 +35,7 @@ export function usePosts(webSocket: WebSocket) {
                     }
                     if (parsedResponse.subscriptionID === subscribeResponse.subscriptionID) {
                         console.log("It's a notification.")
+                        queryClient.invalidateQueries(queryKey)
                     }
                 })
             })
@@ -51,6 +52,7 @@ export function usePosts(webSocket: WebSocket) {
     return useQuery({
         queryKey: queryKey,
         queryFn: getPosts,
+        staleTime: Infinity,
     })
 }
 
