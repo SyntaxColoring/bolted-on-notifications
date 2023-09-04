@@ -20,6 +20,13 @@ export const subscribeRequestSchema = requestSchema.extend({
 export type SubscribeRequest = z.infer<typeof subscribeRequestSchema>
 
 
+export const unsubscribeRequestSchema = requestSchema.extend({
+    messageType: z.literal("unsubscribeRequest"),
+    subscriptionID: z.string(),
+})
+export type UnsubscribeRequest = z.infer<typeof unsubscribeRequestSchema>
+
+
 export const subscribeResponseSchema = responseSchema.extend({
     messageType: z.literal("subscribeResponse"),
     subscriptionID: z.string(),
