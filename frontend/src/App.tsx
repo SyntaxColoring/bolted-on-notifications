@@ -19,7 +19,7 @@ const INITIAL_POSTS: Array<Post> = [
 ]
 
 const queryClient = new QueryClient()
-const webSocket = new WebSocket(WS_URL)
+const webSocket = new ReconnectingWebSocket(WS_URL)
 
 function App(): JSX.Element {
   const [showApp, setShowApp] = React.useState(true)

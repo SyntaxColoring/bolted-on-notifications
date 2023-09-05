@@ -1,8 +1,9 @@
+import ReconnectingWebSocket from "reconnecting-websocket";
 import { z } from "zod"
 import * as wsModels from "./ws-models"
 
 
-export function wsRequest(webSocket: WebSocket, request: wsModels.Request): Promise<wsModels.AnyFromServer> {
+export function wsRequest(webSocket: ReconnectingWebSocket, request: wsModels.Request): Promise<wsModels.AnyFromServer> {
     return new Promise((resolve, reject) => {
         const handleMessage = (event: MessageEvent) => {
             let parsedResponse;
@@ -22,11 +23,12 @@ export function wsRequest(webSocket: WebSocket, request: wsModels.Request): Prom
         }
         webSocket.addEventListener("message", handleMessage)
 
-        webSocket.addEventListener(
-            "close",
-            () => { reject("WebSocket closed") },
-            { once: true }
-        )
+        const handleClose = () => {
+            reject("WebSocket closed")
+            // ReconnectingWebSockets can emit close events multiple times.
+            webSocket.removeEventListener("close", handleClose)
+        }
+        webSocket.addEventListener("close", handleClose)
 
         webSocket.send(JSON.stringify(request))
     })
