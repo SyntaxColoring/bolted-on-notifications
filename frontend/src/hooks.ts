@@ -13,6 +13,8 @@ export function usePosts(webSocket: ReconnectingWebSocket) {
     const queryClient = useQueryClient()
     const queryKey: string[] = ["posts"]
 
+    const webSocketStatus = useWebSocketStatus(webSocket)
+
     useEffect(
         () => {
             const unsubscribe = subscribe(webSocket, queryKey, () => {
@@ -28,6 +30,11 @@ export function usePosts(webSocket: ReconnectingWebSocket) {
         queryKey: queryKey,
         queryFn: getPosts,
         staleTime: Infinity,
+        // TODO: This webSocketStatus check is insufficient. We need to enable the query
+        // when the logical subconnection is open, not when the overall WebSocket connection is open.
+        // Flesh the subscribe() function out into an object whose state we can query synchronously,
+        // maybe, and use useSyncExternalStore.
+        enabled: webSocketStatus === webSocket.OPEN
     })
 }
 
@@ -81,6 +88,27 @@ function subscribe(
 
     return cleanUp
 }
+
+function useWebSocketStatus(webSocket: ReconnectingWebSocket): number {
+    const [status, setStatus] = useState(webSocket.readyState)
+    const refreshStatus = () => {
+        console.log("Refreshing WebSocket status.", webSocket.readyState)
+        setStatus(webSocket.readyState)
+    }
+    useEffect(
+        () => {
+            webSocket.addEventListener("open", refreshStatus)
+            webSocket.addEventListener("close", refreshStatus)
+
+            return () => {
+                webSocket.removeEventListener("open", refreshStatus)
+                webSocket.removeEventListener("close", refreshStatus)
+            }
+        },
+        [webSocket]
+    )
+
+    return status
 }
 
 async function getPosts(): Promise<AllPosts> {
