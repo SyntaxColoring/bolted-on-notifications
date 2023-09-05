@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import dataclasses
+import logging
 import typing
 import uuid
 
@@ -15,9 +16,10 @@ from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.websockets import WebSocket
 
-
 from ._event_emitter import EventBroadcaster
 
+
+_log = logging.getLogger(__name__)
 
 
 class PostPostRequest(msgspec.Struct):
@@ -48,22 +50,32 @@ class QueryParamAsJSON(msgspec.Struct):
     value: str
 
 
-class SubscriptionRequest(msgspec.Struct):
+class SubscribeRequest(msgspec.Struct, tag_field="messageType", tag="subscribeRequest"):
     requestID: str
     urlPath: list[str]
     queryParams: list[QueryParamAsJSON] | msgspec.UnsetType = msgspec.UNSET
     # TODO: Headers, etc.
 
 
-class SubscriptionResponse(msgspec.Struct):
+class SubscribeResponse(msgspec.Struct, tag_field="messageType", tag="subscribeResponse"):
     requestID: str
     subscriptionID: str
-    messageType: typing.Literal["subscribeResponse"] = "subscribeResponse"
 
 
-class SubscriptionNotificaton(msgspec.Struct):
+class UnsubscribeRequest(msgspec.Struct, tag_field="messageType", tag="unsubscribeRequest"):
+    requestID: str
     subscriptionID: str
-    messageType: typing.Literal["subscriptionNotification"] = "subscriptionNotification"
+
+
+class UnsubscribeResponse(msgspec.Struct, tag_field="messageType", tag="unsubscribeResponse"):
+    requestID: str
+
+
+class SubscriptionNotificaton(msgspec.Struct, tag_field="messageType", tag="subscriptionNotification"):
+    subscriptionID: str
+
+
+AnyFromClient = typing.Union[SubscribeRequest, UnsubscribeRequest]
 
 
 @dataclasses.dataclass
@@ -197,39 +209,56 @@ async def websocket_subscribe(websocket: WebSocket) -> None:
     # What happens if this function returns without closing it?
     # TODO: If a WebSocket is open, it seems to hang.
     # TODO: Cancel this task if the WS closes,
+
+    connections: dict[str, asyncio.Task[None]] = {}
+
     async with accept_websocket(websocket), asyncio.TaskGroup() as task_group:
         async for raw_message in websocket.iter_text():
-            # TODO: Specify what should happen if a request is invalid. Kill the whole connection?
-            # Reply to just that request with an error and keep the connection?
-            parsed_message = msgspec.json.decode(raw_message, type=SubscriptionRequest)
-            if parsed_message.urlPath == ["posts"]:
-                async def subscribe_to_posts():
-                    with post_store.event_broadcaster.subscribe() as events:
-                        async for _ in events:
-                            await websocket.send_text(
-                                msgspec.json.encode(
-                                    SubscriptionNotificaton(
-                                        subscriptionID=parsed_message.requestID,
-                                    )
-                                ).decode("utf-8")
-                            )
-                            # TODO: Backpressure.
-
-                task_group.create_task(subscribe_to_posts())
-                response = SubscriptionResponse(
-                    requestID=parsed_message.requestID,
-                    subscriptionID=parsed_message.requestID,
-                )
-                await websocket.send_text(
-                    msgspec.json.encode(response).decode("utf-8")  # TODO: Is UTF-8 appropriate?
-                )
+            try:
+                parsed_message = msgspec.json.decode(raw_message, type=AnyFromClient)
+            except msgspec.DecodeError:
+                # TODO: Specify what should happen if a request is invalid. Kill the whole connection?
+                # Reply to just that request with an error and keep the connection?
+                _log.warn("Error parsing message.", exc_info=True)
             else:
-                raise ValueError(parsed_message.urlPath)
+                if isinstance(parsed_message, SubscribeRequest):
+                    if parsed_message.urlPath == ["posts"]:
+                        subscription_id = f"sub-{parsed_message.requestID}"
+                        async def subscribe_to_posts():
+                            with post_store.event_broadcaster.subscribe() as events:
+                                async for _ in events:
+                                    await websocket.send_text(
+                                        msgspec.json.encode(
+                                            SubscriptionNotificaton(
+                                                subscriptionID=subscription_id,
+                                            )
+                                        ).decode("utf-8")
+                                    )
+                                    # TODO: Backpressure.
+
+                        connections[subscription_id] = task_group.create_task(subscribe_to_posts())
+                        response = SubscribeResponse(
+                            requestID=parsed_message.requestID,
+                            subscriptionID=subscription_id,
+                        )
+                        await websocket.send_text(
+                            msgspec.json.encode(response).decode("utf-8")  # TODO: Is UTF-8 appropriate?
+                        )
+                    else:
+                        raise ValueError(parsed_message.urlPath)
+                elif isinstance(parsed_message, UnsubscribeRequest):
+                    task = connections[parsed_message.subscriptionID]
+                    task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await task
+                    await websocket.send_text(msgspec.json.encode(UnsubscribeResponse(requestID=parsed_message.requestID)).decode("utf-8"))
+                else:
+                    _log.warn(f"Unrecognized message: {parsed_message}")
 
     # TODO: If the client closes the connection, we need to ensure that this stuff gets wound down properly.
 
 
-def route_subscription_request(request: SubscriptionRequest) -> None:
+def route_subscription_request(request: SubscribeRequest) -> None:
     if request.urlPath == ["posts"]:
         raise NotImplementedError
     else:

@@ -88,7 +88,19 @@ function subscribe(
 
     const cleanUp = () => {
         console.log("Cleaning up.")
-        // TODO: Actually send an unsubscribe message on the WebSocket, if it's still open.
+        // FIXME: I think this is a bug that will leak subscriptions.
+        // If the WebSocket is open but we don't have a subscriptionID yet,
+        // we need to wait until we do and then unsubscribe it.
+        // (TODO: This is an obnoxious part of the protocol and we should fix it.)
+        if (webSocket.readyState == webSocket.OPEN && subscriptionID != null) {
+            const message: wsModels.UnsubscribeRequest = {
+                messageType: "unsubscribeRequest",
+                requestID: generateID(),
+                subscriptionID
+            }
+            webSocket.send(JSON.stringify(message))
+            // TODO: Do I have to do anything special to log an error here?
+        }
         webSocket.removeEventListener("open", setUpSubscription)
         webSocket.removeEventListener("message", handleMessage)
         webSocket.removeEventListener("close", handleDisconnection)
