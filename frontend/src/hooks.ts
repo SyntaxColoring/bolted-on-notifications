@@ -9,18 +9,27 @@ import { wsRequest } from './ws-utils'
 
 type SubscriptionRequest = z.infer<typeof wsModels.subscribeRequestSchema>;
 
+// TODO: Also expose the WebSocket connection status and/or the logical subconnection status,
+// so the caller knows more than just that the query is idle for some reason.
 export function usePosts(webSocket: ReconnectingWebSocket) {
     const queryClient = useQueryClient()
     const queryKey: string[] = ["posts"]
 
-    const webSocketStatus = useWebSocketStatus(webSocket)
+    // TODO: Figure out how to move the knowledge that the initial state is "false"
+    // into subscribe(). Ideally, we'd use useSyncExternalStore or something.
+    const [subscriptionConnected, setSubscriptionConnected] = useState(false)
 
     useEffect(
         () => {
-            const unsubscribe = subscribe(webSocket, queryKey, () => {
-                console.log("It's a notification.")
-                queryClient.invalidateQueries(queryKey)
-            })
+            const unsubscribe = subscribe(
+                webSocket,
+                queryKey,
+                () => {
+                    console.log("It's a notification.")
+                    queryClient.invalidateQueries(queryKey)
+                },
+                setSubscriptionConnected
+            )
             return unsubscribe
         },
         [webSocket]
@@ -30,11 +39,7 @@ export function usePosts(webSocket: ReconnectingWebSocket) {
         queryKey: queryKey,
         queryFn: getPosts,
         staleTime: Infinity,
-        // TODO: This webSocketStatus check is insufficient. We need to enable the query
-        // when the logical subconnection is open, not when the overall WebSocket connection is open.
-        // Flesh the subscribe() function out into an object whose state we can query synchronously,
-        // maybe, and use useSyncExternalStore.
-        enabled: webSocketStatus === webSocket.OPEN
+        enabled: subscriptionConnected
     })
 }
 
@@ -42,7 +47,8 @@ export function usePosts(webSocket: ReconnectingWebSocket) {
 function subscribe(
     webSocket: ReconnectingWebSocket,
     urlPath: string[],
-    onNotification: () => void
+    onNotification: () => void,
+    setSubscriptionConnected: (newSubscriptionConnected: boolean) => void
 ): () => void {
     console.log("Subscribing.")
 
@@ -58,6 +64,7 @@ function subscribe(
         }
         wsSubscribeRequest(webSocket, subscribeRequest).then((subscribeResponse) => {
             subscriptionID = subscribeResponse.subscriptionID
+            setSubscriptionConnected(true)
             // TODO: Do I need to do anything special here to make sure errors are logged?
         })
     }
@@ -71,6 +78,7 @@ function subscribe(
 
     const handleDisconnection = () => {
         subscriptionID = null
+        setSubscriptionConnected(false)
     }
 
     webSocket.addEventListener("open", setUpSubscription)
