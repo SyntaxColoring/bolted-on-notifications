@@ -107,6 +107,16 @@ Post add, edit, delete, just locally first
 
 
 
+TODO: Consider switching from individual sub/unsub messages to an idempotent "setSubscriptions" message. More self-descriptive on the network, and easier to implement on the client. But chattier.
+
+
+TODO: Add a debug message type?
+
+
+TODO: Pick a WS subprotocol string/number.
+
+
+
 # Design goals
 
 * Must be implementable in modern native browser APIs. This precludes some WebSocket features like ping/pong, or relying on TCP backpressure.
@@ -117,4 +127,6 @@ Post add, edit, delete, just locally first
 When the client is a web browser, it can't exert backpressure on the server because of limitations in the browser API for WebSockets.
 https://developer.chrome.com/en/articles/websocketstream/
 https://stackoverflow.com/questions/19414277/can-i-have-flow-control-on-my-websockets
+
+
 
