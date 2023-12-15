@@ -1,0 +1,16 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "==0.105.0"
+logging-tree = ">=1.9,<2"
+pydantic = "<3,>=2.5.3"
+python-socketio = ">=5.10.0,<6"
+uvicorn = "==0.25.0"
+
+[dev-packages]
+
+[requires]
+python_version = "3.11.6"
