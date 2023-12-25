@@ -110,7 +110,10 @@ async function getMOTD({
 }: {
   signal: AbortSignal;
 }): Promise<GetMOTDResponse> {
-  const fetchResult = await fetch(FETCH_URL, { signal });
+  const fetchResult = await fetch(FETCH_URL, {
+    signal,
+    headers: { Accept: "application/json" },
+  });
   const parsed = getMOTDResponseSchema.parse(await fetchResult.json());
   return parsed;
 }
@@ -123,7 +126,7 @@ async function putMOTD({
   const body: PutMOTDRequest = { motd: newMOTD };
   const fetchResult = await fetch(FETCH_URL, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
   });
   const parsed = getMOTDResponseSchema.parse(await fetchResult.json());
