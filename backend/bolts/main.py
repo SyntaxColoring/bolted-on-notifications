@@ -14,6 +14,8 @@ from . import _socketio_helpers
 
 
 _log = logging.getLogger(__name__)
+_socketio_log = logging.getLogger("python-socketio")
+_engineio_log = logging.getLogger("python-engineio")
 
 _fastapi_app = fastapi.FastAPI()
 
@@ -49,7 +51,12 @@ async def put_motd(
 
 
 # TODO: Look into async_handlers param. Seems like suspicious unsafe threading.
-_sio_server = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+_sio_server = socketio.AsyncServer(
+    async_mode="asgi",
+    cors_allowed_origins="*",
+    logger=_socketio_log,  # type: ignore[arg-type]
+    engineio_logger=_engineio_log,
+)
 _sio_app = socketio.ASGIApp(
     socketio_server=_sio_server,
     # TODO: It may be easier to have FastAPI forward to Socket.IO instead of the
