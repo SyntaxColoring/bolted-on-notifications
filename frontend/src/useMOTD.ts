@@ -81,6 +81,9 @@ function usePostsSubscription({
           (responseData: unknown) => {
             console.log("Subscribed successfully.", responseData);
             setIsReady(true);
+            // We may have just resubscribed after a period where we were disconnected and
+            // missing events. Treat this as a notification, since we should re-query now.
+            onNotification();
           },
         );
       }
