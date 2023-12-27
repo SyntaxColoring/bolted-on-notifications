@@ -119,8 +119,13 @@ _sio_app = socketio.ASGIApp(
 )
 
 
+_socketio_sessions: dict[str, contextlib.AsyncExitStack] = {}
+
+
 @_socketio_helpers.on_event(_sio_server, "subscribe")
 async def _handle_subscribe(sid: str, data: object) -> object:
+    assert sid not in _socketio_sessions
+
     queue = asyncio.Queue[None]()
 
     async def coroutine() -> None:
@@ -132,6 +137,8 @@ async def _handle_subscribe(sid: str, data: object) -> object:
             await _sio_server.emit(to=sid, event="notification", data={})
 
     exit_stack = contextlib.AsyncExitStack()
+    _socketio_sessions[sid] = exit_stack
+
     exit_stack.enter_context(_motd_store.event_emitter.subscribed(queue.put_nowait))
 
     task = asyncio.create_task(coroutine())
@@ -144,23 +151,17 @@ async def _handle_subscribe(sid: str, data: object) -> object:
 
     exit_stack.push_async_callback(clean_up_task)
 
-    async def handle_disconnect(disconnected_sid: str) -> None:
-        _log.info(f"on disconnect, {disconnected_sid}")
-        if disconnected_sid != sid:
-            return
-        _log.info(f"Disconnecting {sid}...")
-        # TODO: Remove this event listener now.
-        try:
-            await exit_stack.aclose()
-        except:
-            _log.exception(f"Exception disconnecting {sid}.")
-        else:
-            _log.info(f"Disconnected {sid}.")
-
-    _socketio_helpers.on_disconnect(_sio_server, handle_disconnect)
-
     _log.info(f"Subscribed {sid}.")
     return {}
+
+
+@_socketio_helpers.on_disconnect(_sio_server)
+async def handle_disconnect(disconnected_sid: str) -> None:
+    _log.info(f"Disconnecting {disconnected_sid}...")
+    # TODO: Investigate whether it's appropriate for this closure to be async.
+    await _socketio_sessions[disconnected_sid].aclose()
+    del _socketio_sessions[disconnected_sid]
+    _log.info(f"Disconnected {disconnected_sid}.")
 
 
 # TODO: Belongs elsewhere, in uvicorn or global config.
