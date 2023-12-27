@@ -3,6 +3,7 @@ import contextlib
 import datetime
 import logging
 import logging_tree
+import typing
 
 import fastapi
 import fastapi.middleware.cors
@@ -26,6 +27,33 @@ _fastapi_app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@_fastapi_app.middleware("http")
+async def _add_default_cache_control(
+    request: fastapi.Request,
+    call_next: typing.Callable[[fastapi.Request], typing.Awaitable[fastapi.Response]],
+) -> fastapi.Response:
+    """Add a default `Cache-Control: no-cache` header to responses that don't have one.
+
+    `no-cache` means that when the client requests a resource that it's retrieved
+    before, it should always ask the server to see if that resource has updated.
+    This is a good safe default for dynamic APIs.
+
+    Without any `Cache-Control` header, the client would use its own heuristics, which
+    may not be as safe.
+
+    Beware that the name `no-cache` is kind of a misnomer. The server can still reply
+    with 304-not-modified, making the client return the resource from its cache.
+
+    We need to implement this as a middleware instead of as a FastAPI dependency.
+    If you modify the response headers through a FastAPI dependency, they get
+    overwritten by the headers in `fastapi.Response` objects, not merged with them.
+    """
+    response = await call_next(request)
+    if "cache-control" not in response.headers:
+        response.headers["cache-control"] = "no-cache"
+    return response
 
 
 def _now() -> datetime.datetime:
@@ -55,7 +83,6 @@ async def get_motd(request: fastapi.Request) -> fastapi.Response:
             headers={
                 "ETag": _weak_etag(result.etag),
                 "Content-Type": "application/json",
-                "Cache-Control": "no-cache",
             },
         )
 
@@ -73,7 +100,6 @@ async def put_motd(
         headers={
             "ETag": result.etag,
             "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
         },
     )
 
