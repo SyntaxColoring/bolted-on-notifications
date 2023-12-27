@@ -44,8 +44,8 @@ export function useMOTDMutation(): ReactQuery.UseMutationResult<
   const queryClient = ReactQuery.useQueryClient();
   const mutation = ReactQuery.useMutation({
     mutationFn: putMOTD,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    onSuccess: (data: GetMOTDResponse) => {
+      queryClient.setQueryData(QUERY_KEY, data);
     },
   });
 
