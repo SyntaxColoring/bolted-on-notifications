@@ -12,6 +12,14 @@ class GetMOTDResponse(pydantic.BaseModel):
     lastModifiedAt: datetime.datetime
 
 
+class PostButtonRequest(pydantic.BaseModel):
+    pass
+
+
+class GetButtonResponse(pydantic.BaseModel):
+    timesClicked: int
+
+
 class PostPostRequest(pydantic.BaseModel):
     title: str
     body: str

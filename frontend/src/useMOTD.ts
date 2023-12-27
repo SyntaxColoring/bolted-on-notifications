@@ -7,10 +7,11 @@ import {
   PutMOTDRequest,
   getMOTDResponseSchema,
 } from "./httpModels";
+import { SOCKETIO_URL, HTTP_BASE_URL } from "./constants";
 
-const SOCKET_URL = "ws://localhost:8000";
-const FETCH_URL = "http://localhost:8000/motd";
+const URL = HTTP_BASE_URL + "/motd";
 const QUERY_KEY = ["motd"];
+const SUBSCRIPTION_PATH = ["motd"];
 
 export function useMOTD(): ReactQuery.UseQueryResult<GetMOTDResponse> {
   const queryClient = ReactQuery.useQueryClient();
@@ -63,7 +64,7 @@ function usePostsSubscription({
     // Socket.IO should automatically deduplicate this with other connections to the
     // same SOCKET_URL.
     console.log("Connecting socket.");
-    const socket = SocketIO.io(SOCKET_URL, {
+    const socket = SocketIO.io(SOCKETIO_URL, {
       // For debugging--avoid a long-polling connection that we immediately upgrade
       // from, for a cleaner network log.
       transports: ["websocket"],
@@ -77,7 +78,7 @@ function usePostsSubscription({
         console.log("New socket connection. Subscribing to channel.");
         socket.emit(
           "subscribe",
-          null, // Avoids obscure server-side internal errors when there is no data in the event.
+          { path: SUBSCRIPTION_PATH },
           (responseData: unknown) => {
             console.log("Subscribed successfully.", responseData);
             setIsReady(true);
@@ -113,7 +114,7 @@ async function getMOTD({
 }: {
   signal: AbortSignal;
 }): Promise<GetMOTDResponse> {
-  const fetchResult = await fetch(FETCH_URL, {
+  const fetchResult = await fetch(URL, {
     signal,
     headers: { Accept: "application/json" },
   });
@@ -127,7 +128,7 @@ async function putMOTD({
   newMOTD: string;
 }): Promise<GetMOTDResponse> {
   const body: PutMOTDRequest = { motd: newMOTD };
-  const fetchResult = await fetch(FETCH_URL, {
+  const fetchResult = await fetch(URL, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),

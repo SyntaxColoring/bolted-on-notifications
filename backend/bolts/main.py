@@ -10,7 +10,9 @@ import fastapi.middleware.cors
 import socketio
 
 from . import _http_models
+from . import _socketio_models
 from ._motd_store import MOTDStore
+from ._button_store import ButtonStore
 from . import _socketio_helpers
 
 
@@ -65,6 +67,24 @@ def _weak_etag(raw_etag: str) -> str:
 
 
 _motd_store = MOTDStore(initial_motd="default MOTD", initial_modified_at=_now())
+_button_store = ButtonStore()
+
+
+@_fastapi_app.get("/button")
+async def get_button() -> _http_models.GetButtonResponse:
+    return _http_models.GetButtonResponse(
+        timesClicked=_button_store.get_times_clicked()
+    )
+
+
+@_fastapi_app.post("/button")
+async def post_button(
+    body: _http_models.PostButtonRequest,
+) -> _http_models.GetButtonResponse:
+    _button_store.click()
+    return _http_models.GetButtonResponse(
+        timesClicked=_button_store.get_times_clicked()
+    )
 
 
 @_fastapi_app.get("/motd")
@@ -143,7 +163,15 @@ async def _handle_subscribe(sid: str, data: object) -> object:
     exit_stack = contextlib.AsyncExitStack()
     _socketio_sessions[sid] = exit_stack
 
-    exit_stack.enter_context(_motd_store.event_emitter.subscribed(queue.put_nowait))
+    if parsed_data.path == ["motd"]:
+        exit_stack.enter_context(_motd_store.event_emitter.subscribed(queue.put_nowait))
+    elif parsed_data.path == ["button"]:
+        exit_stack.enter_context(
+            _button_store.event_emitter.subscribed(queue.put_nowait)
+        )
+    else:
+        # TODO: Signal "404" errors to the client.
+        pass
 
     task = asyncio.create_task(coroutine())
 
