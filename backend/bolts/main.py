@@ -32,22 +32,50 @@ def _now() -> datetime.datetime:
     return datetime.datetime.now(tz=datetime.UTC)
 
 
+def _weak_etag(raw_etag: str) -> str:
+    return f'W/"{raw_etag}"'
+
+
 _motd_store = MOTDStore(initial_motd="default MOTD", initial_modified_at=_now())
 
 
 @_fastapi_app.get("/motd")
-async def get_motd() -> _http_models.GetMOTDResponse:
-    motd, last_modified_at = _motd_store.get()
-    return _http_models.GetMOTDResponse(motd=motd, lastModifiedAt=last_modified_at)
+async def get_motd(request: fastapi.Request) -> fastapi.Response:
+    result = _motd_store.get()
+    etag = _weak_etag(result.etag)
+    if request.headers.get("if-none-match") == etag:
+        return fastapi.responses.Response(
+            status_code=fastapi.status.HTTP_304_NOT_MODIFIED
+        )
+    else:
+        return fastapi.responses.PlainTextResponse(
+            content=_http_models.GetMOTDResponse(
+                motd=result.motd, lastModifiedAt=result.last_modified_at
+            ).json(),
+            headers={
+                "ETag": _weak_etag(result.etag),
+                "Content-Type": "application/json",
+                "Cache-Control": "no-cache",
+            },
+        )
 
 
 @_fastapi_app.put("/motd")
 async def put_motd(
     request: _http_models.PutMOTDRequest,
-) -> _http_models.GetMOTDResponse:
+) -> fastapi.Response:
     _motd_store.set(motd=request.motd, modified_at=_now())
-    motd, last_modified_at = _motd_store.get()
-    return _http_models.GetMOTDResponse(motd=motd, lastModifiedAt=last_modified_at)
+    result = _motd_store.get()
+    return fastapi.responses.PlainTextResponse(
+        content=_http_models.GetMOTDResponse(
+            motd=result.motd, lastModifiedAt=result.last_modified_at
+        ).json(),
+        headers={
+            "ETag": result.etag,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+        },
+    )
 
 
 # TODO: Look into async_handlers param. Seems like suspicious unsafe threading.
