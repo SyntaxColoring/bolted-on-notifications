@@ -124,7 +124,11 @@ _socketio_sessions: dict[str, contextlib.AsyncExitStack] = {}
 
 @_socketio_helpers.on_event(_sio_server, "subscribe")
 async def _handle_subscribe(sid: str, data: object) -> object:
+    # TODO: Signal resubscription errors to the client.
     assert sid not in _socketio_sessions
+
+    # TODO: Signal parse failures to the client.
+    parsed_data = _socketio_models.SubscribeRequest.parse_obj(data)
 
     queue = asyncio.Queue[None]()
 

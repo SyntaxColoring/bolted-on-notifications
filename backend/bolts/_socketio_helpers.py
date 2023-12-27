@@ -59,6 +59,9 @@ def on_disconnect(
                     "Unhandled exception handling Socket.IO disconnect."
                     + f" (Args {args}, kwargs {kwargs})."
                 )
+                # TODO: Consider propagating this to the client instead of
+                # re-raising it here, because nothing will catch this and it will
+                # print an ugly warning.
                 raise
 
         server.on("disconnect", decorated, namespace)
@@ -106,6 +109,9 @@ def on_event(
                     "Unhandled exception handling Socket.IO event."
                     + f" (Args {args}, kwargs {kwargs})."
                 )
+                # TODO: Consider propagating this to the client instead of
+                # re-raising it here, because nothing will catch this and it will
+                # print an ugly warning.
                 raise
 
         server.on(event_name, decorated, namespace)
