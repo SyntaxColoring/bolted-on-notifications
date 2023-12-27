@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+export const postButtonRequestSchema = z.object({});
+export type PostButtonRequest = z.infer<typeof postButtonRequestSchema>;
+
+export const getButtonResponseSchema = z.object({
+  timesClicked: z.number(),
+});
+export type GetButtonResponse = z.infer<typeof getButtonResponseSchema>;
+
 export const putMOTDRequestSchema = z.object({
   motd: z.string(),
 });

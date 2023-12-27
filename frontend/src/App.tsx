@@ -3,6 +3,7 @@ import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
 import { useMOTD, useMOTDMutation } from "./useMOTD";
+import { useButton, useButtonMutation } from "./useButton";
 
 export default function App() {
   const [count, setCount] = useState(0);
@@ -30,6 +31,7 @@ export default function App() {
         >
           count is {count}
         </button>
+        <Button />
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>
@@ -52,5 +54,30 @@ function MOTD(): JSX.Element {
     return <p>{motdResult.error.message}</p>;
   } else {
     return <p>No data available</p>;
+  }
+}
+
+// TODO: Read react-query docs to learn nuances about fetching, loading, etc.
+// esp. how it interacts with mutations.
+function Button(): JSX.Element {
+  const buttonResult = useButton();
+  const buttonMutationResult = useButtonMutation();
+
+  if (
+    buttonMutationResult.status == "error" ||
+    buttonResult.status == "error"
+  ) {
+    return <button disabled>Error :(</button>;
+  } else if (buttonMutationResult.status == "pending") {
+    return <button disabled>Clicking...</button>;
+  } else if (buttonResult.status == "pending") {
+    return <button disabled>Loading...</button>;
+  } else {
+    const { timesClicked } = buttonResult.data;
+    return (
+      <button onClick={() => buttonMutationResult.mutate()}>
+        This button has been clicked {timesClicked} times
+      </button>
+    );
   }
 }
