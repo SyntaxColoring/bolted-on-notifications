@@ -1,0 +1,12 @@
+# Python
+venv/
+.venv/
+__pycache__/
+
+# JavaScript
+dist/
+node_modules/
+
+# OS and editors
+.DS_Store
+*.sublime-workspace
