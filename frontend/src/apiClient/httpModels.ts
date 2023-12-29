@@ -1,3 +1,5 @@
+// JSON shapes for HTTP requests and responses.
+
 import { z } from "zod";
 
 export const postButtonRequestSchema = z.object({});

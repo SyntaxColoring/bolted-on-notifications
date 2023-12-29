@@ -6,7 +6,7 @@ import {
   GetMOTDResponse,
   PutMOTDRequest,
   getMOTDResponseSchema,
-} from "./httpModels";
+} from "./apiClient/httpModels";
 import { SOCKETIO_URL, HTTP_BASE_URL } from "./constants";
 
 const URL = HTTP_BASE_URL + "/motd";
