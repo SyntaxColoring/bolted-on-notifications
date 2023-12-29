@@ -17,12 +17,12 @@ import {
   subscribeAckData,
 } from "./socketioModels";
 
-export default function useSubscribedQuery<T>(
+export function useSubscribedQuery<T>(
   queryKey: QueryKey,
   subscriptionPath: string[],
   queryFn: QueryFunction<T>,
   queryClient?: QueryClient,
-): UseQueryResult<T> {
+): UseSubscribedQueryResult<T> {
   const queryClientOrDefault = useQueryClient(queryClient);
 
   const onNotification = useCallback(() => {
@@ -37,7 +37,7 @@ export default function useSubscribedQuery<T>(
 
   const subscriptionStatus = useSubscription(request, onNotification);
 
-  const result = useQuery(
+  const useQueryResult = useQuery(
     {
       queryKey,
       queryFn: queryFn,
@@ -48,7 +48,11 @@ export default function useSubscribedQuery<T>(
     },
     queryClient,
   );
-  return result;
+
+  return {
+    ...useQueryResult,
+    subscriptionStatus,
+  };
 }
 
 /**
@@ -65,6 +69,10 @@ export default function useSubscribedQuery<T>(
  * data models.
  */
 export type SubscriptionStatus = "tryingToSubscribe" | "healthy" | "fatalError";
+
+export type UseSubscribedQueryResult<T> = UseQueryResult<T> & {
+  subscriptionStatus: SubscriptionStatus;
+};
 
 function useSubscription(
   request: SubscribeData,

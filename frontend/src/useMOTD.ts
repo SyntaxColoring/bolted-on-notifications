@@ -6,13 +6,16 @@ import {
   getMOTDResponseSchema,
 } from "./apiClient/httpModels";
 import { HTTP_BASE_URL } from "./constants";
-import useSubscribedQuery from "./apiClient/useSubscribedQuery";
+import {
+  useSubscribedQuery,
+  UseSubscribedQueryResult,
+} from "./apiClient/useSubscribedQuery";
 
 const URL = HTTP_BASE_URL + "/motd";
 const QUERY_KEY = ["motd"];
 const SUBSCRIPTION_PATH = ["motd"];
 
-export function useMOTD(): ReactQuery.UseQueryResult<GetMOTDResponse> {
+export function useMOTD(): UseSubscribedQueryResult<GetMOTDResponse> {
   return useSubscribedQuery(QUERY_KEY, SUBSCRIPTION_PATH, getMOTD);
 }
 

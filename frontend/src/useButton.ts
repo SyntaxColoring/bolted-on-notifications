@@ -6,7 +6,7 @@ import {
   getButtonResponseSchema,
 } from "./apiClient/httpModels";
 import { HTTP_BASE_URL } from "./constants";
-import useSubscribedQuery from "./apiClient/useSubscribedQuery";
+import { useSubscribedQuery } from "./apiClient/useSubscribedQuery";
 
 const URL = HTTP_BASE_URL + "/button";
 const QUERY_KEY = ["button"];

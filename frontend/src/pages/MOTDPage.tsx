@@ -33,8 +33,10 @@ function MOTD(): JSX.Element {
 
   const value = motdQuery.data?.motd ?? "<contents unavailable>";
 
-  // TODO: This does not account for initial WebSocket connection time.
-  const showSpinner = motdMutation.isPending || motdQuery.isFetching;
+  const showSpinner =
+    motdMutation.isPending ||
+    motdQuery.isFetching ||
+    motdQuery.subscriptionStatus === "tryingToSubscribe";
 
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
