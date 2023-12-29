@@ -66,7 +66,7 @@ def _weak_etag(raw_etag: str) -> str:
     return f'W/"{raw_etag}"'
 
 
-_motd_store = MOTDStore(initial_motd="default MOTD", initial_modified_at=_now())
+_motd_store = MOTDStore(initial_motd="Edit me!", initial_modified_at=_now())
 _button_store = ButtonStore()
 
 
