@@ -11,6 +11,16 @@ python-socketio = ">=5.10.0,<6"
 uvicorn = "==0.25.0"
 
 [dev-packages]
+pyright = "<2,>=1.1.343"
+ruff = ">=0.1.9,<0.2"
 
 [requires]
 python_version = "3.11.6"
+
+[scripts]
+check-types = "pyright"
+check-lint = "ruff check"
+check-format = "ruff format --diff"
+fix-lint = "ruff check --fix"
+fix-format = "ruff format"
+dev = "uvicorn bolts.main:app --reload"
