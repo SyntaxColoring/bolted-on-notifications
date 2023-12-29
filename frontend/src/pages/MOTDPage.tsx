@@ -38,6 +38,11 @@ function MOTD(): JSX.Element {
     motdQuery.isFetching ||
     motdQuery.subscriptionStatus === "tryingToSubscribe";
 
+  const showError =
+    motdMutation.isError ||
+    motdQuery.isError ||
+    motdQuery.subscriptionStatus === "fatalError";
+
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   let lastModifiedAt = null;
@@ -121,6 +126,7 @@ function MOTD(): JSX.Element {
               textColor=""
             />
           )}
+          {showError && <Text color="red">Error</Text>}
           {buttons}
         </Flex>
       </Flex>
