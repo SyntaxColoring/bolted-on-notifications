@@ -1,5 +1,5 @@
 import datetime
-from typing import Literal
+import enum
 
 import pydantic
 
@@ -13,7 +13,11 @@ class GetTextResponse(pydantic.BaseModel):
     lastModifiedAt: datetime.datetime
 
 
-ButtonID = Literal["red", "green", "blue", "yellow"]
+class ButtonID(enum.Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+    YELLOW = "yellow"
 
 
 class PostButtonRequest(pydantic.BaseModel):

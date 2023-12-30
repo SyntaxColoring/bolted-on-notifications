@@ -93,6 +93,5 @@ function queryKey(buttonID: ButtonID): ReactQuery.QueryKey {
 }
 
 function subscriptionPath(buttonID: ButtonID): string[] {
-  // TODO: Subscribe more granularly.
-  return SUBSCRIPTION_PATH_BASE;
+  return [...SUBSCRIPTION_PATH_BASE, buttonID];
 }

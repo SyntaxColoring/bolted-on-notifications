@@ -72,14 +72,26 @@ _button_store = ButtonStore()
 
 def _public_to_internal_button(public: _http_models.ButtonID) -> Button:
     match public:
-        case "red":
+        case _http_models.ButtonID.RED:
             return Button.RED
-        case "green":
+        case _http_models.ButtonID.GREEN:
             return Button.GREEN
-        case "blue":
+        case _http_models.ButtonID.BLUE:
             return Button.BLUE
-        case "yellow":
+        case _http_models.ButtonID.YELLOW:
             return Button.YELLOW
+
+
+@contextlib.contextmanager
+def _subscribe_to_specific_button(
+    button_store: ButtonStore, button: Button, callback: typing.Callable[[None], None]
+) -> typing.Generator[None, None, None]:
+    def filtering_callback(event: Button) -> None:
+        if event == button:
+            callback(None)
+
+    with button_store.event_emitter.subscribed(filtering_callback):
+        yield
 
 
 @_fastapi_app.get("/buttons/{button_id}")
@@ -181,15 +193,20 @@ async def _handle_subscribe(sid: str, data: object) -> object:
     exit_stack = contextlib.AsyncExitStack()
     _socketio_sessions[sid] = exit_stack
 
-    if parsed_data.path == ["text"]:
-        exit_stack.enter_context(_text_store.event_emitter.subscribed(queue.put_nowait))
-    elif parsed_data.path == ["buttons"]:
-        exit_stack.enter_context(
-            _button_store.event_emitter.subscribed(queue.put_nowait)
-        )
-    else:
-        # TODO: Signal "404" errors to the client.
-        pass
+    match parsed_data.path:
+        case ["text"]:
+            exit_stack.enter_context(
+                _text_store.event_emitter.subscribed(queue.put_nowait)
+            )
+        case ["buttons", raw_button_id]:
+            # TODO: Consider parse errors here.
+            button = _public_to_internal_button(_http_models.ButtonID(raw_button_id))
+            exit_stack.enter_context(
+                _subscribe_to_specific_button(_button_store, button, queue.put_nowait)
+            )
+        case _:
+            # TODO: Signal "404" errors to the client.
+            pass
 
     task = asyncio.create_task(coroutine())
 
