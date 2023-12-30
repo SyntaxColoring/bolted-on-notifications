@@ -1,0 +1,20 @@
+{
+	"folders":
+	[
+		{
+			"path": ".",
+		}
+	],
+	"settings": {
+		"LSP": {
+			"LSP-pylsp": {
+				"enabled": false
+			},
+			"LSP-pyright": {
+				"settings": {
+					"python.pythonPath": ".venv/bin/python"
+				}
+			}
+		}
+	}
+}
