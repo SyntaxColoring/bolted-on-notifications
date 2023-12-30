@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 
+export type ButtonID = "red" | "green" | "blue" | "yellow";
+
 export const postButtonRequestSchema = z.object({});
 export type PostButtonRequest = z.infer<typeof postButtonRequestSchema>;
 

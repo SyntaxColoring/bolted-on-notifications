@@ -1,4 +1,5 @@
 import datetime
+from typing import Literal
 
 import pydantic
 
@@ -10,6 +11,9 @@ class PutTextRequest(pydantic.BaseModel):
 class GetTextResponse(pydantic.BaseModel):
     text: str
     lastModifiedAt: datetime.datetime
+
+
+ButtonID = Literal["red", "green", "blue", "yellow"]
 
 
 class PostButtonRequest(pydantic.BaseModel):

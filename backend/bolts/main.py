@@ -12,7 +12,7 @@ import socketio
 from . import _http_models
 from . import _socketio_models
 from ._text_store import TextStore
-from ._button_store import ButtonStore
+from ._button_store import Button, ButtonStore
 from . import _socketio_helpers
 
 
@@ -70,20 +70,38 @@ _text_store = TextStore(initial_text="Edit me!", initial_modified_at=_now())
 _button_store = ButtonStore()
 
 
-@_fastapi_app.get("/button")
-async def get_button() -> _http_models.GetButtonResponse:
+def _public_to_internal_button(public: _http_models.ButtonID) -> Button:
+    match public:
+        case "red":
+            return Button.RED
+        case "green":
+            return Button.GREEN
+        case "blue":
+            return Button.BLUE
+        case "yellow":
+            return Button.YELLOW
+
+
+@_fastapi_app.get("/buttons/{button_id}")
+async def get_button(
+    button_id: _http_models.ButtonID,
+) -> _http_models.GetButtonResponse:
     return _http_models.GetButtonResponse(
-        timesClicked=_button_store.get_times_clicked()
+        timesClicked=_button_store.get_times_clicked(
+            _public_to_internal_button(button_id)
+        )
     )
 
 
-@_fastapi_app.post("/button")
+@_fastapi_app.post("/buttons/{button_id}")
 async def post_button(
     body: _http_models.PostButtonRequest,
+    button_id: _http_models.ButtonID,
 ) -> _http_models.GetButtonResponse:
-    _button_store.click()
+    button = _public_to_internal_button(button_id)
+    _button_store.click(button)
     return _http_models.GetButtonResponse(
-        timesClicked=_button_store.get_times_clicked()
+        timesClicked=_button_store.get_times_clicked(button)
     )
 
 
@@ -165,7 +183,7 @@ async def _handle_subscribe(sid: str, data: object) -> object:
 
     if parsed_data.path == ["text"]:
         exit_stack.enter_context(_text_store.event_emitter.subscribed(queue.put_nowait))
-    elif parsed_data.path == ["button"]:
+    elif parsed_data.path == ["buttons"]:
         exit_stack.enter_context(
             _button_store.event_emitter.subscribed(queue.put_nowait)
         )
