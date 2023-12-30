@@ -1,277 +1,109 @@
 import asyncio
 import contextlib
-import dataclasses
+import datetime
 import logging
-import typing
-import uuid
+import logging_tree
 
-import msgspec
-import msgspec.json
+import fastapi
+import fastapi.middleware.cors
+import socketio
 
-import starlette.applications
-import starlette.requests
-import starlette.responses
-from starlette.routing import Route, WebSocketRoute
-from starlette.middleware import Middleware
-from starlette.middleware.cors import CORSMiddleware
-from starlette.websockets import WebSocket
-
-from ._event_emitter import EventBroadcaster
+from . import _http_models
+from ._motd_store import MOTDStore
+from . import _socketio_helpers
 
 
 _log = logging.getLogger(__name__)
 
+_fastapi_app = fastapi.FastAPI()
 
-class PostPostRequest(msgspec.Struct):
-    title: str
-    body: str
+_fastapi_app.add_middleware(
+    fastapi.middleware.cors.CORSMiddleware,
+    allow_origins=("*"),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-class GetPostResponse(msgspec.Struct):
-    id: str
-    title: str
-    body: str
+def _now() -> datetime.datetime:
+    return datetime.datetime.now(tz=datetime.UTC)
 
 
-class PostTitleOnly(msgspec.Struct):
-    title: str
+_motd_store = MOTDStore(initial_motd="default MOTD", initial_modified_at=_now())
 
 
-class GetAllPostsResponse(msgspec.Struct):
-    data: list[GetPostResponse]
+@_fastapi_app.get("/motd")
+async def get_motd() -> _http_models.GetMOTDResponse:
+    motd, last_modified_at = _motd_store.get()
+    return _http_models.GetMOTDResponse(motd=motd, lastModifiedAt=last_modified_at)
 
 
-class GetAllPostsResponseTitlesOnly(msgspec.Struct):
-    data: list[PostTitleOnly]
+@_fastapi_app.put("/motd")
+async def put_motd(
+    request: _http_models.PutMOTDRequest,
+) -> _http_models.GetMOTDResponse:
+    _motd_store.set(motd=request.motd, modified_at=_now())
+    motd, last_modified_at = _motd_store.get()
+    return _http_models.GetMOTDResponse(motd=motd, lastModifiedAt=last_modified_at)
 
 
-class QueryParamAsJSON(msgspec.Struct):
-    name: str
-    value: str
+# TODO: Look into async_handlers param. Seems like suspicious unsafe threading.
+_sio_server = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+_sio_app = socketio.ASGIApp(
+    socketio_server=_sio_server,
+    # TODO: It may be easier to have FastAPI forward to Socket.IO instead of the
+    # other way around, for handling things like CORS headers.
+    other_asgi_app=_fastapi_app,
+)
 
 
-class SubscribeRequest(msgspec.Struct, tag_field="messageType", tag="subscribeRequest"):
-    requestID: str
-    urlPath: list[str]
-    queryParams: list[QueryParamAsJSON] | msgspec.UnsetType = msgspec.UNSET
-    # TODO: Headers, etc.
+@_socketio_helpers.on_event(_sio_server, "subscribe")
+async def _handle_subscribe(sid: str, data: object) -> object:
+    queue = asyncio.Queue[None]()
 
+    async def coroutine() -> None:
+        while True:
+            await queue.get()
+            # The python-socketio docs warn against calling emit() concurrently.
+            # We're relying on each connection will only ever being emitted to by one task.
+            _log.info(f"Delivering notification to {sid}.")
+            await _sio_server.emit(to=sid, event="notification", data={})
 
-class SubscribeResponse(msgspec.Struct, tag_field="messageType", tag="subscribeResponse"):
-    requestID: str
-    subscriptionID: str
+    exit_stack = contextlib.AsyncExitStack()
+    exit_stack.enter_context(_motd_store.event_emitter.subscribed(queue.put_nowait))
 
+    task = asyncio.create_task(coroutine())
 
-class UnsubscribeRequest(msgspec.Struct, tag_field="messageType", tag="unsubscribeRequest"):
-    requestID: str
-    subscriptionID: str
+    async def clean_up_task() -> None:
+        _log.debug("clean_up_task()")
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
 
+    exit_stack.push_async_callback(clean_up_task)
 
-class UnsubscribeResponse(msgspec.Struct, tag_field="messageType", tag="unsubscribeResponse"):
-    requestID: str
+    async def handle_disconnect(disconnected_sid: str) -> None:
+        _log.info(f"on disconnect, {disconnected_sid}")
+        if disconnected_sid != sid:
+            return
+        _log.info(f"Disconnecting {sid}...")
+        # TODO: Remove this event listener now.
+        try:
+            await exit_stack.aclose()
+        except:
+            _log.exception(f"Exception disconnecting {sid}.")
+        else:
+            _log.info(f"Disconnected {sid}.")
 
+    _socketio_helpers.on_disconnect(_sio_server, handle_disconnect)
 
-class SubscriptionNotificaton(msgspec.Struct, tag_field="messageType", tag="subscriptionNotification"):
-    subscriptionID: str
+    _log.info(f"Subscribed {sid}.")
+    return {}
 
 
-AnyFromClient = typing.Union[SubscribeRequest, UnsubscribeRequest]
-
-
-@dataclasses.dataclass
-class Post:
-    id: str
-    title: str
-    body: str
-
-
-@dataclasses.dataclass
-class PostUpdatedEvent:
-    id: str
-
-
-@dataclasses.dataclass
-class PostAddedEvent:
-    id: str
-
-
-@dataclasses.dataclass
-class PostDeletedEvent:
-    id: str
-
-
-# TODO: Okay, how do we compose these events if there are containing resources?
-class PostStore:
-    def __init__(self) -> None:
-        self._posts: dict[str, Post] = {}
-        self._event_broadcaster = EventBroadcaster[PostUpdatedEvent | PostAddedEvent | PostDeletedEvent]()
-
-    @property
-    def event_broadcaster(self) -> EventBroadcaster[PostUpdatedEvent | PostAddedEvent | PostDeletedEvent]:
-        return self._event_broadcaster
-
-    def add(self, new_post: Post) -> None:
-        assert new_post.id not in self._posts
-        self._posts[new_post.id] = new_post
-        self._event_broadcaster.publish(PostAddedEvent(id=new_post.id))
-
-    def update(self, new_post: Post) -> None:
-        assert new_post.id in self._posts
-        self._posts[new_post.id] = new_post
-        self._event_broadcaster.publish(PostUpdatedEvent(id=new_post.id))
-
-    def delete(self, id: str) -> None:
-        del self._posts[id]
-        self._event_broadcaster.publish(PostDeletedEvent(id=id))
-
-    def get(self, id: str) -> Post:
-        return self._posts[id]
-
-    def get_all(self) -> list[Post]:
-        return list(self._posts.values())
-
-
-post_store = PostStore()
-
-
-async def _get_all_posts(titles_only: bool) -> GetAllPostsResponse | GetAllPostsResponseTitlesOnly:
-    if titles_only:
-        return GetAllPostsResponseTitlesOnly(
-            data=[PostTitleOnly(title=p.title) for p in post_store.get_all()]
-        )
-    else:
-        return GetAllPostsResponse(
-            data=[GetPostResponse(id=p.id, title=p.title, body=p.body) for p in post_store.get_all()]
-        )
-
-
-async def get_all_posts(request: starlette.requests.Request):
-    field_set = request.query_params.get("fieldSet", "all")
-    if field_set not in {"all", "titlesOnly"}:
-        raise ValueError(field_set)
-
-    result = await _get_all_posts(titles_only=field_set == "titlesOnly")
-
-    return starlette.responses.Response(
-        content=msgspec.json.encode(result),
-        media_type="application/json",
-    )
-
-
-async def get_post(request: starlette.requests.Request) -> None:
-    raise NotImplementedError
-
-
-async def _post_post(title: str, body: str) -> Post:
-    id = str(uuid.uuid4())
-    new_post = Post(id=id, title=title, body=body)
-    post_store.add(new_post)
-    return new_post
-
-
-async def post_post(request: starlette.requests.Request) -> starlette.responses.Response:
-    request_body = msgspec.json.decode(await request.body(), type=PostPostRequest)
-    new_post = await _post_post(title=request_body.title, body=request_body.body)
-    return starlette.responses.Response(
-        content=msgspec.json.encode(new_post),
-        media_type="application/json",
-        status_code=201,
-    )
-
-
-async def delete_post(request: starlette.requests.Request):
-    raise NotImplementedError
-
-
-class SubscriptionHandler:
-    def __init__(self, subscription_id: str, websocket: WebSocket) -> None:
-        self._subscription_id = subscription_id
-        self._websocket = websocket
-
-
-@contextlib.asynccontextmanager
-async def accept_websocket(websocket: WebSocket) -> typing.AsyncGenerator[None, None]:
-    await websocket.accept()
-    try:
-        yield None
-    except:
-        # 1011="server encountered an unexpeced condition."
-        # No idea if that's the appropriate code.
-        await websocket.close(code=1011)
-        raise
-    else:
-        # TODO: If the client closes the WS, we get a "double close" error message.
-        await websocket.close()
-
-
-async def websocket_subscribe(websocket: WebSocket) -> None:
-    # TODO: Is closing a Starlette WebSocket necessary?
-    # What happens if this function returns without closing it?
-    # TODO: If a WebSocket is open, it seems to hang.
-    # TODO: Cancel this task if the WS closes,
-
-    connections: dict[str, asyncio.Task[None]] = {}
-
-    async with accept_websocket(websocket), asyncio.TaskGroup() as task_group:
-        async for raw_message in websocket.iter_text():
-            try:
-                parsed_message = msgspec.json.decode(raw_message, type=AnyFromClient)
-            except msgspec.DecodeError:
-                # TODO: Specify what should happen if a request is invalid. Kill the whole connection?
-                # Reply to just that request with an error and keep the connection?
-                _log.warn("Error parsing message.", exc_info=True)
-            else:
-                if isinstance(parsed_message, SubscribeRequest):
-                    if parsed_message.urlPath == ["posts"]:
-                        subscription_id = f"sub-{parsed_message.requestID}"
-                        async def subscribe_to_posts():
-                            with post_store.event_broadcaster.subscribe() as events:
-                                async for _ in events:
-                                    await websocket.send_text(
-                                        msgspec.json.encode(
-                                            SubscriptionNotificaton(
-                                                subscriptionID=subscription_id,
-                                            )
-                                        ).decode("utf-8")
-                                    )
-                                    # TODO: Backpressure.
-
-                        connections[subscription_id] = task_group.create_task(subscribe_to_posts())
-                        response = SubscribeResponse(
-                            requestID=parsed_message.requestID,
-                            subscriptionID=subscription_id,
-                        )
-                        await websocket.send_text(
-                            msgspec.json.encode(response).decode("utf-8")  # TODO: Is UTF-8 appropriate?
-                        )
-                    else:
-                        raise ValueError(parsed_message.urlPath)
-                elif isinstance(parsed_message, UnsubscribeRequest):
-                    task = connections[parsed_message.subscriptionID]
-                    task.cancel()
-                    with contextlib.suppress(asyncio.CancelledError):
-                        await task
-                    await websocket.send_text(msgspec.json.encode(UnsubscribeResponse(requestID=parsed_message.requestID)).decode("utf-8"))
-                else:
-                    _log.warn(f"Unrecognized message: {parsed_message}")
-
-    # TODO: If the client closes the connection, we need to ensure that this stuff gets wound down properly.
-
-
-def route_subscription_request(request: SubscribeRequest) -> None:
-    if request.urlPath == ["posts"]:
-        raise NotImplementedError
-    else:
-        raise ValueError
-
-
-routes = [
-    WebSocketRoute("/subscribe", endpoint=websocket_subscribe),
-    Route("/posts", endpoint=get_all_posts, methods=["GET"]),
-    Route("/posts", endpoint=post_post, methods=["POST"]),
-    Route("/posts/{id}", endpoint=get_post, methods=["GET"]),
-]
-middleware = [
-    Middleware(CORSMiddleware, allow_origins=["*"])
-]
-app = starlette.applications.Starlette(routes=routes, middleware=middleware)
+# TODO: Belongs elsewhere, in uvicorn or global config.
+logging.basicConfig(level="DEBUG")
+_log.info("Starting up.")
+logging_tree.printout()
+app = _sio_app
