@@ -3,12 +3,12 @@ import datetime
 import pydantic
 
 
-class PutMOTDRequest(pydantic.BaseModel):
-    motd: str
+class PutTextRequest(pydantic.BaseModel):
+    text: str
 
 
-class GetMOTDResponse(pydantic.BaseModel):
-    motd: str
+class GetTextResponse(pydantic.BaseModel):
+    text: str
     lastModifiedAt: datetime.datetime
 
 

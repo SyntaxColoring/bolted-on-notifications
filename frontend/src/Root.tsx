@@ -19,7 +19,7 @@ function RootComponent(): JSX.Element {
 
 function NavBar(): JSX.Element {
   const links = [
-    { to: "/", text: "MOTD" },
+    { to: "/", text: "Communal Textarea" },
     { to: "button-funtown", text: "Button Funtown" },
     { to: "posts", text: "Posts" },
   ];

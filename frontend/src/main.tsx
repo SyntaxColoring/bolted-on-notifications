@@ -8,11 +8,11 @@ import { Router, RouterProvider } from "@tanstack/react-router";
 
 import { rootRoute } from "./Root.tsx";
 import { notFoundRoute } from "./pages/NotFoundPage.tsx";
-import { route as motdRoute } from "./pages/MOTDPage.tsx";
+import { route as textRoute } from "./pages/TextPage.tsx";
 import { route as buttonsRoute } from "./pages/ButtonsPage.tsx";
 import { route as postsRoute } from "./pages/PostsPage.tsx";
 
-const routeTree = rootRoute.addChildren([motdRoute, buttonsRoute, postsRoute]);
+const routeTree = rootRoute.addChildren([textRoute, buttonsRoute, postsRoute]);
 const router = new Router({ routeTree, notFoundRoute });
 
 // https://tanstack.com/router/v1/docs/guide/routes#registering-router-types

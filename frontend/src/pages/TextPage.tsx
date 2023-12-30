@@ -2,7 +2,7 @@ import { Route } from "@tanstack/react-router";
 import { Heading } from "@radix-ui/themes";
 
 import { rootRoute } from "../Root";
-import { useMOTD, useMOTDMutation } from "../useMOTD";
+import { useText, useTextMutation } from "../useText";
 import { Button, Flex, Text, TextArea } from "@radix-ui/themes";
 import { useRef, useState } from "react";
 import { ThreeDot } from "react-loading-indicators";
@@ -10,14 +10,14 @@ import { ThreeDot } from "react-loading-indicators";
 export const route = new Route({
   path: "/",
   getParentRoute: () => rootRoute,
-  component: MOTDPage,
+  component: TextPage,
 });
 
-export function MOTDPage(): JSX.Element {
+export function TextPage(): JSX.Element {
   return (
     <>
-      <Heading my="3">Message of the Day</Heading>
-      <MOTD />
+      <Heading my="3">Communal Textarea</Heading>
+      <SyncedTextArea />
     </>
   );
 }
@@ -26,28 +26,28 @@ export function MOTDPage(): JSX.Element {
 // Loading
 // No data available
 // Background refetch failed
-function MOTD(): JSX.Element {
+function SyncedTextArea(): JSX.Element {
   const [editing, setEditing] = useState(false);
-  const motdQuery = useMOTD();
-  const motdMutation = useMOTDMutation();
+  const textQuery = useText();
+  const textMutation = useTextMutation();
 
-  const value = motdQuery.data?.motd ?? "<contents unavailable>";
+  const value = textQuery.data?.text ?? "<contents unavailable>";
 
   const showSpinner =
-    motdMutation.isPending ||
-    motdQuery.isFetching ||
-    motdQuery.subscriptionStatus === "tryingToSubscribe";
+    textMutation.isPending ||
+    textQuery.isFetching ||
+    textQuery.subscriptionStatus === "tryingToSubscribe";
 
   const showError =
-    motdMutation.isError ||
-    motdQuery.isError ||
-    motdQuery.subscriptionStatus === "fatalError";
+    textMutation.isError ||
+    textQuery.isError ||
+    textQuery.subscriptionStatus === "fatalError";
 
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   let lastModifiedAt = null;
-  if (motdQuery.data != null) {
-    lastModifiedAt = new Date(motdQuery.data.lastModifiedAt).toLocaleString();
+  if (textQuery.data != null) {
+    lastModifiedAt = new Date(textQuery.data.lastModifiedAt).toLocaleString();
   }
 
   let textArea;
@@ -57,7 +57,7 @@ function MOTD(): JSX.Element {
         ref={textAreaRef}
         size="3"
         rows={10}
-        disabled={motdMutation.isPending}
+        disabled={textMutation.isPending}
         defaultValue={value}
       />
     );
@@ -71,14 +71,14 @@ function MOTD(): JSX.Element {
   if (editing) {
     buttons = (
       <>
-        <Button type="submit" disabled={motdMutation.isPending}>
+        <Button type="submit" disabled={textMutation.isPending}>
           Save
         </Button>
         <Button
           type="button"
           variant="outline"
           onClick={() => {
-            motdMutation.reset();
+            textMutation.reset();
             setEditing(false);
           }}
         >
@@ -109,8 +109,8 @@ function MOTD(): JSX.Element {
       onSubmit={(event) => {
         event.preventDefault();
         const value = textAreaRef.current!.value;
-        motdMutation.mutate(
-          { newMOTD: value },
+        textMutation.mutate(
+          { newText: value },
           { onSuccess: () => setEditing(false) },
         );
       }}

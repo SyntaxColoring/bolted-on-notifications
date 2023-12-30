@@ -10,13 +10,13 @@ export const getButtonResponseSchema = z.object({
 });
 export type GetButtonResponse = z.infer<typeof getButtonResponseSchema>;
 
-export const putMOTDRequestSchema = z.object({
-  motd: z.string(),
+export const putTextRequestSchema = z.object({
+  text: z.string(),
 });
-export type PutMOTDRequest = z.infer<typeof putMOTDRequestSchema>;
+export type PutTextRequest = z.infer<typeof putTextRequestSchema>;
 
-export const getMOTDResponseSchema = z.object({
-  motd: z.string(),
+export const getTextResponseSchema = z.object({
+  text: z.string(),
   lastModifiedAt: z.string(),
 });
-export type GetMOTDResponse = z.infer<typeof getMOTDResponseSchema>;
+export type GetTextResponse = z.infer<typeof getTextResponseSchema>;

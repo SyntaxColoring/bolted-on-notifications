@@ -11,7 +11,7 @@ import socketio
 
 from . import _http_models
 from . import _socketio_models
-from ._motd_store import MOTDStore
+from ._text_store import TextStore
 from ._button_store import ButtonStore
 from . import _socketio_helpers
 
@@ -66,7 +66,7 @@ def _weak_etag(raw_etag: str) -> str:
     return f'W/"{raw_etag}"'
 
 
-_motd_store = MOTDStore(initial_motd="Edit me!", initial_modified_at=_now())
+_text_store = TextStore(initial_text="Edit me!", initial_modified_at=_now())
 _button_store = ButtonStore()
 
 
@@ -87,9 +87,9 @@ async def post_button(
     )
 
 
-@_fastapi_app.get("/motd")
-async def get_motd(request: fastapi.Request) -> fastapi.Response:
-    result = _motd_store.get()
+@_fastapi_app.get("/text")
+async def get_text(request: fastapi.Request) -> fastapi.Response:
+    result = _text_store.get()
     etag = _weak_etag(result.etag)
     if request.headers.get("if-none-match") == etag:
         return fastapi.responses.Response(
@@ -97,8 +97,8 @@ async def get_motd(request: fastapi.Request) -> fastapi.Response:
         )
     else:
         return fastapi.responses.PlainTextResponse(
-            content=_http_models.GetMOTDResponse(
-                motd=result.motd, lastModifiedAt=result.last_modified_at
+            content=_http_models.GetTextResponse(
+                text=result.text, lastModifiedAt=result.last_modified_at
             ).json(),
             headers={
                 "ETag": _weak_etag(result.etag),
@@ -107,15 +107,15 @@ async def get_motd(request: fastapi.Request) -> fastapi.Response:
         )
 
 
-@_fastapi_app.put("/motd")
-async def put_motd(
-    request: _http_models.PutMOTDRequest,
+@_fastapi_app.put("/text")
+async def put_text(
+    request: _http_models.PutTextRequest,
 ) -> fastapi.Response:
-    _motd_store.set(motd=request.motd, modified_at=_now())
-    result = _motd_store.get()
+    _text_store.set(text=request.text, modified_at=_now())
+    result = _text_store.get()
     return fastapi.responses.PlainTextResponse(
-        content=_http_models.GetMOTDResponse(
-            motd=result.motd, lastModifiedAt=result.last_modified_at
+        content=_http_models.GetTextResponse(
+            text=result.text, lastModifiedAt=result.last_modified_at
         ).json(),
         headers={
             "ETag": result.etag,
@@ -163,8 +163,8 @@ async def _handle_subscribe(sid: str, data: object) -> object:
     exit_stack = contextlib.AsyncExitStack()
     _socketio_sessions[sid] = exit_stack
 
-    if parsed_data.path == ["motd"]:
-        exit_stack.enter_context(_motd_store.event_emitter.subscribed(queue.put_nowait))
+    if parsed_data.path == ["text"]:
+        exit_stack.enter_context(_text_store.event_emitter.subscribed(queue.put_nowait))
     elif parsed_data.path == ["button"]:
         exit_stack.enter_context(
             _button_store.event_emitter.subscribed(queue.put_nowait)
