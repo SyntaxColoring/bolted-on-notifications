@@ -19,9 +19,9 @@ function RootComponent(): JSX.Element {
 
 function NavBar(): JSX.Element {
   const links = [
-    { to: "/", text: "Communal Textarea" },
+    { to: "/", text: "Home" },
+    { to: "communal-textarea", text: "Communal Textarea" },
     { to: "button-funtown", text: "Button Funtown" },
-    { to: "posts", text: "Posts" },
   ];
 
   const matchRoute = useMatchRoute();

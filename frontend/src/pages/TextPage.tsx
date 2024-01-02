@@ -8,7 +8,7 @@ import { useRef, useState } from "react";
 import { ThreeDot } from "react-loading-indicators";
 
 export const route = new Route({
-  path: "/",
+  path: "communal-textarea",
   getParentRoute: () => rootRoute,
   component: TextPage,
 });
