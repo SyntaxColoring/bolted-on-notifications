@@ -1,0 +1,32 @@
+on: push
+name: Static checks
+jobs:
+  backend:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.6'
+      - run: pip install pipenv==2023.11.15
+      - run: pipenv install --dev
+      - run: pipenv run check-types
+      - run: pipenv run check-lint
+      - run: pipenv run check-format
+  frontend:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+      - run: npm ci
+      - run: npm run check-types
+      - run: npm run check-lint
+      - run: npm run check-format
