@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import { Button, Container, Flex, Separator, Box } from "@radix-ui/themes";
 import { Link, Outlet, RootRoute, useMatchRoute } from "@tanstack/react-router";
 

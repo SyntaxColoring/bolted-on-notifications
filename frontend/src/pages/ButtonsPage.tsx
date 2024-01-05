@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import { Route } from "@tanstack/react-router";
 import { Button, Flex, Heading } from "@radix-ui/themes";
 
