@@ -7,8 +7,10 @@ import typing
 
 import fastapi
 import fastapi.middleware.cors
+import fastapi.staticfiles
 import socketio
 
+from . import _frontend_serving
 from . import _http_models
 from . import _socketio_models
 from ._text_store import TextStore
@@ -21,6 +23,7 @@ _socketio_log = logging.getLogger("python-socketio")
 _engineio_log = logging.getLogger("python-engineio")
 
 _fastapi_app = fastapi.FastAPI()
+_api_router = fastapi.APIRouter(prefix="/api")
 
 _fastapi_app.add_middleware(
     fastapi.middleware.cors.CORSMiddleware,
@@ -94,7 +97,7 @@ def _subscribe_to_specific_button(
         yield
 
 
-@_fastapi_app.get("/buttons/{button_id}")
+@_api_router.get("/buttons/{button_id}")
 async def get_button(
     button_id: _http_models.ButtonID,
 ) -> _http_models.GetButtonResponse:
@@ -105,7 +108,7 @@ async def get_button(
     )
 
 
-@_fastapi_app.post("/buttons/{button_id}")
+@_api_router.post("/buttons/{button_id}")
 async def post_button(
     body: _http_models.PostButtonRequest,
     button_id: _http_models.ButtonID,
@@ -117,7 +120,7 @@ async def post_button(
     )
 
 
-@_fastapi_app.get("/text")
+@_api_router.get("/text")
 async def get_text(request: fastapi.Request) -> fastapi.Response:
     result = _text_store.get()
     etag = _weak_etag(result.etag)
@@ -137,7 +140,7 @@ async def get_text(request: fastapi.Request) -> fastapi.Response:
         )
 
 
-@_fastapi_app.put("/text")
+@_api_router.put("/text")
 async def put_text(
     request: _http_models.PutTextRequest,
 ) -> fastapi.Response:
@@ -231,8 +234,12 @@ async def handle_disconnect(disconnected_sid: str) -> None:
     _log.info(f"Disconnected {disconnected_sid}.")
 
 
+_fastapi_app.include_router(_api_router)
+_fastapi_app.mount("/", _frontend_serving.app)
+
 # TODO: Belongs elsewhere, in uvicorn or global config.
 logging.basicConfig(level="DEBUG")
 _log.info("Starting up.")
 logging_tree.printout()
+
 app = _sio_app

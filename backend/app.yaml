@@ -1,0 +1,25 @@
+# This configures how this server is run on Google App Engine.
+
+runtime: python
+
+env: flex # Required for WebSockets.
+
+runtime_config:
+  runtime_version: "3.11"
+  # https://cloud.google.com/appengine/docs/flexible/lifecycle/support-schedule#python
+  operating_system: "ubuntu22"
+
+entrypoint: uvicorn bolts.main:app --host 0.0.0.0 --port $PORT
+
+resources:
+  disk_size_gb: 10 # Minimum supported by Google.
+  # Google's defaults for everything else are already their minimums.
+
+manual_scaling:
+  # Since we're only keeping the application state in memory
+  # (not e.g. a shared database), we need to limit it to one
+  # instance so every client sees the same thing.
+  #
+  # Ideally, we would scale down to 0 when idle,
+  # but that's not supported with `env: flex`.
+  instances: 1

@@ -9,7 +9,7 @@
     "check-format": "prettier --check .",
     "fix-format": "prettier --write .",
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build --outDir ../backend/static_files --emptyOutDir",
     "preview": "vite preview"
   },
   "dependencies": {

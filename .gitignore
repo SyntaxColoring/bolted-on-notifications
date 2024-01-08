@@ -5,6 +5,7 @@ __pycache__/
 
 # JavaScript
 dist/
+backend/static_files/
 node_modules/
 
 # OS and editors
